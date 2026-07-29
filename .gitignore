@@ -30,7 +30,8 @@ secrets/*
 *.retry
 .ansible/
 ansible.log
-*.retry
+inventory*.ini
+*.ini
 
 # Python
 __pycache__/
