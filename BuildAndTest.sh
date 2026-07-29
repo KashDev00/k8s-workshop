@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 cd initInfra
 terraform destroy -auto-approve || true
@@ -25,7 +26,7 @@ echo "Deploying Gateway infrastructure..."
 kubectl apply -f gateway.yaml
 
 echo "Waiting for Cilium to create the Gateway service..."
-until kubectl get svc cilium-gateway-gateway &>/dev/null && [ -n "$(kubectl get svc cilium-gateway-gateway -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)" ]; do
+until kubectl get svc cilium-gateway-gateway >/dev/null 2>&1 && [ -n "$(kubectl get svc cilium-gateway-gateway -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null)" ]; do
     sleep 3
 done
 
