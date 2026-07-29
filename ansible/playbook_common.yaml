@@ -1,0 +1,231 @@
+---
+- name: Configure Kubernetes Dependencies and Base System
+  hosts: all
+  become: true
+  vars:
+    # Kubernetes Version (v1.35 is the latest stable)
+    k8s_version: "v1.35"
+    
+  tasks:
+    # -----------------------------------------------------------------------
+    # 0. Wait for VM and Cloud-Init to Finish (Prevents apt/dpkg Lock Conflicts)
+    # -----------------------------------------------------------------------
+    - name: Wait for the VM to be reachable and fully booted
+      wait_for_connection:
+        timeout: 600
+        delay: 5
+
+    - name: Wait for cloud-init to complete
+      command: cloud-init status --wait
+      changed_when: false
+      register: cloud_init_res
+      until: cloud_init_res.rc == 0
+      retries: 30
+      delay: 10
+
+    - name: Wait for unattended upgrades (apt locks) to finish
+      shell: |
+        while fuser /var/lib/dpkg/lock >/dev/null 2>&1 || \
+              fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || \
+              fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+          sleep 5
+        done
+      changed_when: false
+
+    # -----------------------------------------------------------------------
+    # 1. Hostname Configuration (Prevent Kubelet Identity Mismatch)
+    # -----------------------------------------------------------------------
+    # Fetch truth directly from the OpenStack metadata service (169.254.169.254)
+    # Ref: https://docs.openstack.org/nova/rocky/user/metadata-service.html
+    - name: Fetch true OpenStack instance name from Metadata API
+      shell: curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1
+      register: openstack_hostname
+
+    - name: Set OS hostname to OpenStack instance name
+      hostname:
+        name: "{{ openstack_hostname.stdout }}"
+
+    - name: Ensure hostname is set immediately (hostnamectl fallback)
+      command: hostnamectl set-hostname "{{ openstack_hostname.stdout }}"
+      when: ansible_hostname != openstack_hostname.stdout
+
+    # -----------------------------------------------------------------------
+    # 1. System Configuration
+    # -----------------------------------------------------------------------
+    - name: Disable swap
+      shell: |
+        swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Remove swap entry from /etc/fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+        replace: '# \1'
+
+    - name: Load kernel modules for containerd
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Modprobe kernel modules
+      shell: |
+        modprobe overlay
+        modprobe br_netfilter
+
+    - name: Configure sysctl params for Kubernetes
+      copy:
+        dest: /etc/sysctl.d/k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+
+    - name: Apply sysctl params
+      command: sysctl --system
+
+    # -----------------------------------------------------------------------
+    # 2. Dependencies & Container Runtime (containerd)
+    # -----------------------------------------------------------------------
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - socat
+        state: present
+        update_cache: yes
+      register: apt_res
+      until: apt_res is success
+      retries: 5
+      delay: 10
+
+    - name: Create directory for Docker keyring
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Add Docker GPG key
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+      register: curl_res
+      until: curl_res is success
+      retries: 5
+      delay: 10
+
+    - name: Add Docker repository
+      shell: |
+        echo \
+          "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+          $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install containerd
+      apt:
+        name: containerd.io
+        state: present
+        update_cache: yes
+      register: apt_res
+      until: apt_res is success
+      retries: 30
+      delay: 15
+
+    - name: Generate default containerd config
+      shell: |
+        mkdir -p /etc/containerd
+        containerd config default > /etc/containerd/config.toml
+
+    - name: Ensure SystemdCgroup is true in containerd config
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: 'SystemdCgroup = false'
+        replace: 'SystemdCgroup = true'
+
+    - name: Ensure CRI plugin is enabled (comment out disabled_plugins)
+      replace:
+        path: /etc/containerd/config.toml
+        regexp: '^(\s*)disabled_plugins\s*=\s*\["cri"\]'
+        replace: '# \1disabled_plugins = ["cri"]'
+
+    - name: Restart and enable containerd
+      systemd:
+        name: containerd
+        state: restarted
+        enabled: yes
+
+    # -----------------------------------------------------------------------
+    # 3. Kubernetes Components (kubeadm, kubelet, kubectl)
+    # -----------------------------------------------------------------------
+    - name: Download Kubernetes public signing key
+      shell: |
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/{{ k8s_version }}/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      register: curl_res
+      until: curl_res is success
+      retries: 5
+      delay: 10
+
+    - name: Add Kubernetes apt repository
+      shell: |
+        echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ k8s_version }}/deb/ /" | tee /etc/apt/sources.list.d/kubernetes.list
+      args:
+        creates: /etc/apt/sources.list.d/kubernetes.list
+
+    - name: Install kubelet, kubeadm, kubectl
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: yes
+      register: apt_res
+      until: apt_res is success
+      retries: 30
+      delay: 15
+
+    - name: Hold Kubernetes packages
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      register: dpkg_res
+      until: dpkg_res is success
+      retries: 30
+      delay: 15
+
+    - name: Configure Kubelet
+      shell: |
+        echo "KUBELET_EXTRA_ARGS=--hostname-override={{ openstack_hostname.stdout }}" > /etc/default/kubelet
+
+    - name: Restart Kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+
+    # -----------------------------------------------------------------------
+    # 4. Longhorn Data Directory (Worker Nodes Only)
+    # -----------------------------------------------------------------------
+    # Longhorn uses /data0 as a hostPath mount for file data storage.
+    # This runs on all nodes but is only used by workers.
+    - name: Create Longhorn data directory
+      file:
+        path: /data0
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+      when: "'workers' in group_names"

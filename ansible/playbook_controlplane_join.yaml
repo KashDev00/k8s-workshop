@@ -1,0 +1,54 @@
+# -----------------------------------------------------------------------
+# Play 1: Bootstrap Node (Index 0 in inventory)
+# -----------------------------------------------------------------------
+- name: Get Join Details from Bootstrap Node
+  hosts: controlplane[0]
+  become: true
+  tasks:
+    - name: Upload Certificates
+      command: kubeadm init phase upload-certs --upload-certs
+      register: upload_certs_output
+
+    - name: Set Certificate Key
+      set_fact:
+        certificate_key: "{{ upload_certs_output.stdout_lines[-1] }}"
+
+    - name: Create Join Token
+      command: kubeadm token create --print-join-command
+      register: join_command_output
+
+    - name: Build Full Join Command
+      set_fact:
+        join_cmd: "{{ join_command_output.stdout }} --control-plane --certificate-key {{ certificate_key }}"
+
+    - name: Store Join Command for other plays
+      add_host:
+        name: "JOIN_HOLDER"
+        join_cmd: "{{ join_cmd }}"
+
+# -----------------------------------------------------------------------
+# Play 2: Remaining Control Plane Nodes (Index 1+ in inventory)
+# -----------------------------------------------------------------------
+- name: Join Secondary Control Plane Nodes
+  hosts: controlplane:!controlplane[0]
+  become: true
+  tasks:
+    - name: Check if node is already part of cluster
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Fetch true OpenStack instance name from Metadata API
+      shell: curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1
+      register: openstack_hostname
+      when: not kubelet_conf.stat.exists
+
+    - name: Join the Cluster
+      shell: "{{ hostvars['JOIN_HOLDER']['join_cmd'] }} --node-name={{ openstack_hostname.stdout }}"
+      when: not kubelet_conf.stat.exists
+      register: join_output
+
+    - name: Print Join Success
+      debug:
+        msg: "Node joined successfully: {{ join_output.stdout }}"
+      when: not kubelet_conf.stat.exists

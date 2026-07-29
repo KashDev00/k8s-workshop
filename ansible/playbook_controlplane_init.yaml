@@ -1,0 +1,175 @@
+---
+- name: Bootstrap Initial Control Plane
+  hosts: controlplane
+  become: true
+  vars:
+    # Adjust this if you have a Load Balancer VIP. 
+    # Defaults to the node's IP if not provided.
+    # Format: "IP:PORT" e.g. "192.168.1.100:6443"
+    # control_plane_endpoint: "" 
+    pod_network_cidr: "10.0.0.0/16"
+
+  tasks:
+    - name: Determine Control Plane Endpoint
+      set_fact:
+        final_cp_endpoint: "{{ control_plane_endpoint | default(ansible_default_ipv4.address + ':6443', true) }}"
+
+    - name: Check if existing admin.conf matches current Load Balancer IP
+      shell: |
+        if [ -f /etc/kubernetes/admin.conf ]; then
+          openssl x509 -noout -text -in /etc/kubernetes/pki/apiserver.crt | grep "IP Address:{{ final_cp_endpoint | split(':') | first }}" || echo "MISMATCH"
+        fi
+      register: cert_check
+      changed_when: false
+
+    - name: Reset Cluster if IP Mismatch Detected
+      command: kubeadm reset -f
+      when: cert_check.stdout == "MISMATCH"
+
+    - name: Cleanup old configs if IP Mismatch Detected
+      file:
+        path: "{{ item }}"
+        state: absent
+      when: cert_check.stdout == "MISMATCH"
+      loop:
+        - /etc/kubernetes/admin.conf
+        - /etc/kubernetes/pki
+        - /home/ubuntu/.kube/config
+
+    - name: Fetch true OpenStack instance name from Metadata API
+      shell: curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1
+      register: openstack_hostname
+
+    - name: Initialize Kubernetes Cluster
+      command: >
+        kubeadm init
+        --node-name="{{ openstack_hostname.stdout }}"
+        --control-plane-endpoint "{{ final_cp_endpoint }}"
+        --upload-certs
+        --pod-network-cidr={{ pod_network_cidr }}
+        --skip-token-print
+        --skip-phases=addon/kube-proxy
+      register: kubeadm_init
+      # Check for existence of admin.conf to prevent re-running (unless reset happened)
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Create .kube directory for ubuntu user
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+
+
+    - name: Fetch kubeconfig to local machine
+      fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: ../kubeconfigs/stfc-cloud.kubeconfig
+        flat: yes
+
+
+    - name: Debug Final CP Endpoint
+      debug:
+        var: final_cp_endpoint
+
+    - name: Update kubeconfig to use LoadBalancer IP
+      delegate_to: localhost
+      become: false
+      shell: |
+        sed -i 's|server: https://.*:6443|server: https://{{ final_cp_endpoint }}:6443|g' "{{ playbook_dir }}/../kubeconfigs/stfc-cloud.kubeconfig"
+      args:
+        executable: /bin/bash
+
+    - name: Rename kubeconfig identifiers to zone-specific names
+      delegate_to: localhost
+      become: false
+      shell: |
+        KUBECONFIG="{{ playbook_dir }}/../kubeconfigs/stfc-cloud.kubeconfig"
+        # Rename cluster
+        sed -i 's|name: kubernetes$|name: stfc-cloud|g' "$KUBECONFIG"
+        sed -i 's|cluster: kubernetes$|cluster: stfc-cloud|g' "$KUBECONFIG"
+        # Rename user
+        sed -i 's|name: kubernetes-admin$|name: stfc-cloud-admin|g' "$KUBECONFIG"
+        sed -i 's|user: kubernetes-admin$|user: stfc-cloud-admin|g' "$KUBECONFIG"
+        # Rename context
+        sed -i 's|name: kubernetes-admin@kubernetes$|name: stfc-cloud-admin@stfc-cloud|g' "$KUBECONFIG"
+        sed -i 's|current-context: kubernetes-admin@kubernetes$|current-context: stfc-cloud-admin@stfc-cloud|g' "$KUBECONFIG"
+      args:
+        executable: /bin/bash
+
+    # -----------------------------------------------------------------------
+    # 2. Network Plugin (Cilium) & Gateway API
+    # -----------------------------------------------------------------------
+    - name: Install Helm
+      shell: |
+        curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Install Gateway API CRDs
+      command: >
+        kubectl apply  -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/standard-install.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+
+    - name: Add Cilium Helm Repo
+      kubernetes.core.helm_repository:
+        name: cilium
+        repo_url: https://helm.cilium.io/
+
+    - name: Install Cilium with Gateway API
+      kubernetes.core.helm:
+        name: cilium
+        chart_ref: cilium/cilium
+        release_namespace: kube-system
+        kubeconfig: /etc/kubernetes/admin.conf
+        values:
+          cluster:
+            id: 1
+            name: stfc-cloud
+          k8sServiceHost: "{{ final_cp_endpoint.split(':')[0] }}"
+          k8sServicePort: "6443"
+          gatewayAPI:
+            enabled: true
+          ipam:
+            operator:
+              clusterPoolIPv4PodCIDRList:
+                - "{{ pod_network_cidr }}"
+          kubeProxyReplacement: true
+          hubble:
+            relay:
+              enabled: true
+            ui:
+              enabled: true
+
+    - name: Add Metrics Server Helm Repo
+      kubernetes.core.helm_repository:
+        name: metrics-server
+        repo_url: https://kubernetes-sigs.github.io/metrics-server/
+
+    - name: Install Metrics Server
+      kubernetes.core.helm:
+        name: metrics-server
+        chart_ref: metrics-server/metrics-server
+        release_namespace: kube-system
+        kubeconfig: /etc/kubernetes/admin.conf
+        values:
+          args:
+            - --kubelet-insecure-tls
+            - --kubelet-preferred-address-types=InternalIP
+            
+
+    - name: Print Bootstrap Success
+      debug:
+        msg: "Cluster bootstrapped successfully! Cilium & Gateway API installed. Kubeconfig fetched to ../kubeconfigs/stfc-cloud.kubeconfig"

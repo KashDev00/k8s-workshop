@@ -1,0 +1,50 @@
+# Credentials
+.env
+.env.*
+!.env.example
+
+# Kubernetes
+kubeconfig
+kubeconfig_*
+*.kubeconfig
+kubeconfigs/*.kubeconfig
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+
+secrets/*
+!secrets/.gitkeep
+!secrets/README.md
+
+# Ansible
+*.retry
+.ansible/
+ansible.log
+*.retry
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
