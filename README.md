@@ -122,9 +122,14 @@ The easiest way to deploy the cluster is using the provided automation script:
 bash BuildAndTest.sh
 ```
 
-#### Manual Deployment Workflow
+#### 📖 Manual Cluster Setup Guide (Interactive Learning Tutorials)
 
-If you prefer to run the playbooks manually, navigate to the `ansible/` directory and execute them in order:
+If you want to learn how the Kubernetes cluster is built from scratch by running Linux, container runtime, and `kubeadm` commands by hand, check out our step-by-step manual setup documentation:
+- **[Manual Cluster Setup Overview & Roadmap](docs/manual-setup/README.md)**
+
+#### Manual Ansible Playbook Execution
+
+If you prefer to run the Ansible playbooks manually, navigate to the `ansible/` directory and execute them in order:
 
 **Step 1: Base Configuration (All Nodes)**
 Sets hostnames, installs containerd, kubeadm, kubelet, and dependencies.
