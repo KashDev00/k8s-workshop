@@ -112,6 +112,7 @@ Follow these guides in numerical order to build your cluster from scratch:
 
 | Step | Guide | Ansible Playbook | Target Nodes | What You Learn |
 | :---: | :--- | :--- | :--- | :--- |
+| **00** | **[Linux Fundamentals & Prerequisites](00-linux-prerequisites-for-kubernetes.md)** | *(Conceptual & Prerequisite)* | **All Nodes** | Understanding the 7 core Linux kernel prerequisites (`overlay`, `br_netfilter`), IP forwarding sysctls, cgroups (`SystemdCgroup`), swap memory management, Policy-Based Routing, and OpenStack Metadata (`169.254.169.254`). |
 | **01** | **[Common Node Preparation](01-common-node-setup.md)** | `playbook_common.yaml` | **All 6 K8s Nodes**<br/>(CP 0–2, Worker 0–2) | Hostname synchronization via OpenStack Metadata API, swap disabling, kernel modules (`overlay`, `br_netfilter`), sysctl tuning, `containerd`, and installing `kubeadm`, `kubelet`, `kubectl`. |
 | **02** | **[Load Balancer Setup](02-load-balancer-setup.md)** | `playbook_lb.yaml` | **Load Balancer VM** | Installing HAProxy, configuring round-robin backend health checks, and OpenStack floating IP asymmetric policy routing via Netplan. |
 | **03** | **[Control Plane Bootstrap](03-controlplane-init.md)** | `playbook_controlplane_init.yaml` | **controlplane-0**<br/>(Primary CP) | Initializing Kubernetes v1.35 without `kube-proxy`, setting up administrator `kubeconfig`, installing Helm, **Gateway API v1.6.1**, **Cilium CNI**, and Metrics Server. |
@@ -122,4 +123,4 @@ Follow these guides in numerical order to build your cluster from scratch:
 ---
 
 > [!TIP]
-> **Ready to begin?** Proceed to **[Step 01: Common Node Preparation](01-common-node-setup.md)** to configure the Linux operating system and install your base Kubernetes runtime on all nodes.
+> **Ready to begin?** Start with **[Step 00: Linux Fundamentals & Prerequisites](00-linux-prerequisites-for-kubernetes.md)** to master the Linux kernel concepts behind Kubernetes, or jump directly to **[Step 01: Common Node Preparation](01-common-node-setup.md)** to start hands-on execution.

@@ -5,6 +5,9 @@
 
 Before Kubernetes can be initialized or joined, every node must be prepared with the correct kernel modules, networking rules, container runtime (`containerd`), and Kubernetes CLI/agent packages (`kubeadm`, `kubelet`, `kubectl`).
 
+> [!TIP]
+> **Want to understand the Linux science behind these commands?** Read **[Step 00: Linux Fundamentals & Kernel Prerequisites](00-linux-prerequisites-for-kubernetes.md)** for deep-dive explanations on `overlay`, `br_netfilter`, IP forwarding, swap disabling, and cgroup drivers.
+
 Repeat the following instructions on **all 6 Kubernetes nodes**.
 
 ---
@@ -122,6 +125,7 @@ sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release socat
 
 # 2. Add Docker official GPG key and APT repository
+# Note: Why use /etc/apt/keyrings/ and gpg --dearmor? See Step 00 (Linux Fundamentals) for how isolated APT keyrings protect your OS.
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 
