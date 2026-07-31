@@ -115,7 +115,7 @@ kubectl logs -n kube-system -l k8s-app=cilium --tail=50
 ### 2.2 IP Mismatch or Certificate SAN Errors (`kubeadm init` failed)
 * **Symptom:** API server certificates reject connections, or you used the wrong `FINAL_CP_ENDPOINT` during `kubeadm init`.
 * **What this fix does:** Reverts `kubeadm` initialization state, stops core containers, and deletes generated TLS certificates and config files.
-* **Why we are doing it:** Kubernetes control plane certificates bake the IP address and hostname into immutable Subject Alternative Names (SANs). If an incorrect Load Balancer VIP was used, you must wipe the generated PKI directory before re-running `kubeadm init`.
+* **Why we are doing it:** Kubernetes control plane certificates bake the IP address and hostname into immutable Subject Alternative Names (SANs). If an incorrect control plane endpoint IP was used, you must wipe the generated PKI directory before re-running `kubeadm init`.
 
 ```bash
 # 1. Reset kubeadm state

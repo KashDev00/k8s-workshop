@@ -30,7 +30,7 @@ Worker nodes host your application Pods, Cilium CNI routing rules, and Longhorn 
 ## 1. Generate Worker Join Command (on `controlplane-0`)
 
 - **What this step does:** Creates a temporary Kubernetes API authentication token and outputs a formatted `kubeadm join` command containing the API server endpoint, token, and root CA certificate SHA-256 hash.
-- **Why we are doing it:** Worker nodes do not need `--control-plane` flags or certificate decryption keys because they do not host `etcd` or API servers. They only need a trusted token and CA hash to authenticate with the Load Balancer VIP and register their `kubelet`.
+- **Why we are doing it:** Worker nodes do not need `--control-plane` flags or certificate decryption keys because they do not host `etcd` or API servers. They only need a trusted token and CA hash to authenticate with the control plane endpoint and register their `kubelet`.
 
 Execute this command **on `controlplane-0`**:
 

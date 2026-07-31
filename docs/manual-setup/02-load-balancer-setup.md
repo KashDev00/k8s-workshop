@@ -3,7 +3,7 @@
 **Playbook Reference:** `ansible/playbook_lb.yaml`  
 **Target Node:** Dedicated Load Balancer VM (`loadbalancer`)
 
-In this architecture, OpenStack Amphora/Octavia provides the Load Balancer VIP for the Kubernetes API (`port 6443`), while a dedicated **HAProxy VM** serves as the ingress entrypoint for application HTTP traffic (`port 80`), forwarding requests to the worker nodes on NodePort `30080`.
+In this architecture, a dedicated **HAProxy VM** serves as the ingress entrypoint for application HTTP traffic (`port 80`), forwarding requests to the worker nodes on NodePort `30080`. The Kubernetes API (`port 6443`) is accessed directly via `controlplane-0`'s IP address.
 
 Execute the following steps **only on the `loadbalancer` VM**.
 

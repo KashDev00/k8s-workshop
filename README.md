@@ -12,49 +12,47 @@ graph TD
         FIP[Floating IP]
     end
 
-    subgraph "OpenStack Services"
-        ROUTER[OpenStack Router]
-        AMPHORA[Amphora LB: KubeAPI]
-        ADMIN((Admin / kubectl))
-    end
-
-    %% The Internal Network
-    subgraph "User-Defined Private Network"
-        HAPROXY[VM: HAProxy LB]
-        
-        subgraph "Kubernetes Cluster"
-            CP1[Control Plane 1]
-            CP2[Control Plane 2]
-            CP3[Control Plane 3]
-            W1[Worker 1]
-            W2[Worker 2]
-            W3[Worker 3]
-            CIL[Cilium CNI]
-        end
-    end
-
-    %% Application Traffic Flow
-    USER --> FIP
-    FIP --> ROUTER
-    ROUTER -- "Port 30080" --> HAPROXY
-    HAPROXY -- "App Traffic" --> W1 & W2 & W3
-
-    %% Management Flow (Private)
-    ADMIN --> AMPHORA
-    AMPHORA -- "Port 6443" --> CP1 & CP2 & CP3
-    
-    %% Internal Connectivity
-    CP1 & CP2 & CP3 --- CIL
-    W1 & W2 & W3 --- CIL
-
-    style CP1 fill:#f9f,stroke:#333,stroke-width:2px
-    style CP2 fill:#f9f,stroke:#333,stroke-width:2px
-    style CP3 fill:#f9f,stroke:#333,stroke-width:2px
-    style HAPROXY fill:#3498db,stroke:#fff,stroke-width:2px
-    style AMPHORA fill:#9b59b6,stroke:#fff,stroke-width:2px
-    style CIL fill:#e67e22,stroke:#fff,stroke-width:2px
-    style FIP fill:#2ecc71,stroke:#fff,stroke-width:2px
-    style ROUTER fill:#95a5a6,stroke:#333
+    subgraph "OpenStack Services"\r
+        ROUTER[OpenStack Router]\r
+        ADMIN((Admin / kubectl))\r
+    end\r
+\r
+    %% The Internal Network\r
+    subgraph "User-Defined Private Network"\r
+        HAPROXY[VM: HAProxy LB]\r
+        \r
+        subgraph "Kubernetes Cluster"\r
+            CP1[Control Plane 1<br/>API Endpoint :6443]\r
+            CP2[Control Plane 2]\r
+            CP3[Control Plane 3]\r
+            W1[Worker 1]\r
+            W2[Worker 2]\r
+            W3[Worker 3]\r
+            CIL[Cilium CNI]\r
+        end\r
+    end\r
+\r
+    %% Application Traffic Flow\r
+    USER --> FIP\r
+    FIP --> ROUTER\r
+    ROUTER -- "Port 30080" --> HAPROXY\r
+    HAPROXY -- "App Traffic" --> W1 & W2 & W3\r
+\r
+    %% Management Flow (Private)\r
+    ADMIN -- "Port 6443" --> CP1\r
+    CP1 -- "etcd raft" --> CP2 & CP3\r
+    \r
+    %% Internal Connectivity\r
+    CP1 & CP2 & CP3 --- CIL\r
+    W1 & W2 & W3 --- CIL\r
+\r
+    style CP1 fill:#27ae60,stroke:#fff,stroke-width:2px\r
+    style CP2 fill:#f9f,stroke:#333,stroke-width:2px\r
+    style CP3 fill:#f9f,stroke:#333,stroke-width:2px\r
+    style HAPROXY fill:#3498db,stroke:#fff,stroke-width:2px\r
+    style CIL fill:#e67e22,stroke:#fff,stroke-width:2px\r
+    style FIP fill:#2ecc71,stroke:#fff,stroke-width:2px\r
+    style ROUTER fill:#95a5a6,stroke:#333\r
     style ADMIN fill:#ffffff,stroke:#333
 ```
 

@@ -12,16 +12,15 @@ This documentation translates every automated step from the Ansible playbooks in
 
 ## 🏛️ Cluster Architecture & Node Inventory
 
-The cluster consists of **7 Ubuntu 24.04 LTS Virtual Machines** and an **OpenStack Amphora Load Balancer VIP**:
+The cluster consists of **7 Ubuntu 24.04 LTS Virtual Machines**:
 
 ```mermaid
 graph TD
     subgraph "OpenStack Cloud Infrastructure"
-        VIP[OpenStack Amphora LB VIP<br/>Kubernetes API - Port 6443]
         HAPROXY[VM: HAProxy Load Balancer<br/>HTTP App Ingress - Port 80]
         
         subgraph "Kubernetes Control Plane (HA)"
-            CP0[controlplane-0<br/>Bootstrap Node]
+            CP0[controlplane-0<br/>Bootstrap Node<br/>API Endpoint :6443]
             CP1[controlplane-1<br/>Secondary CP]
             CP2[controlplane-2<br/>Secondary CP]
         end
@@ -33,12 +32,11 @@ graph TD
         end
     end
 
-    VIP -- "TCP 6443 (Round Robin)" --> CP0 & CP1 & CP2
+    CP0 -- "etcd raft consensus" --> CP1 & CP2
     HAPROXY -- "HTTP Port 80 -> NodePort 30080" --> W0 & W1 & W2
 
-    style VIP fill:#27ae60,stroke:#fff,stroke-width:2px
+    style CP0 fill:#27ae60,stroke:#fff,stroke-width:2px
     style HAPROXY fill:#3498db,stroke:#fff,stroke-width:2px
-    style CP0 fill:#f9f,stroke:#333,stroke-width:2px
     style CP1 fill:#f9f,stroke:#333,stroke-width:2px
     style CP2 fill:#f9f,stroke:#333,stroke-width:2px
     style W0 fill:#e67e22,stroke:#fff,stroke-width:2px
@@ -48,7 +46,7 @@ graph TD
 
 | Component | Type / Count | Identifier Pattern | Core Responsibility |
 | :--- | :---: | :--- | :--- |
-| **KubeAPI Load Balancer** | OpenStack VIP (1) | `k8s_api_lb` | OpenStack Amphora Octavia LB providing a single HA Virtual IP for the Kubernetes API (`port 6443`) across all control plane nodes. |
+| **KubeAPI Endpoint** | controlplane-0 IP | `controlplane-0` | The Kubernetes API (`port 6443`) is accessed directly via `controlplane-0`'s internal IP address. All nodes and `kubectl` clients connect to this IP. |
 | **HTTP Load Balancer VM** | Ubuntu VM (1) | `loadbalancer` (`haproxy_lb`) | Dedicated HAProxy ingress VM with Floating IP that routes incoming HTTP application traffic (`port 80`) to worker NodePort `30080`. |
 | **Control Plane Nodes** | Ubuntu VMs (3) | `controlplane-0...2` | High Availability Kubernetes Control Plane (`kube-apiserver`, `etcd`, `kube-scheduler`, `kube-controller-manager`). |
 | **Worker Nodes** | Ubuntu VMs (3) | `worker-0...2` | Application workload execution, Cilium CNI, and Longhorn distributed storage (`/data0`). |
@@ -69,11 +67,11 @@ Before starting the manual setup:
 
 ## 🚀 How to Continue After `terraform apply` (Bridging Infra to Manual K8s)
 
-When `terraform apply` finishes in `initInfra/`, your 7 VMs and OpenStack Amphora Load Balancer VIP are booted, but **no Kubernetes software is installed yet**. 
+When `terraform apply` finishes in `initInfra/`, your 7 VMs are booted, but **no Kubernetes software is installed yet**. 
 
 Here is exactly how to start manual cluster assembly:
 
-### 1. Locate Your VM IP Addresses and Load Balancer VIP
+### 1. Locate Your VM IP Addresses and Control Plane Endpoint
 Terraform automatically generates the Ansible inventory files in `ansible/` containing the exact IP addresses of every VM. Check your VM IP addresses anytime from the project root:
 
 ```bash
@@ -81,12 +79,7 @@ Terraform automatically generates the Ansible inventory files in `ansible/` cont
 cat ansible/inventory_all.ini
 ```
 
-To find your **Kubernetes API Load Balancer VIP** (used in Step 03 as `FINAL_CP_ENDPOINT`), query Terraform's output:
-
-```bash
-cd initInfra
-terraform output
-```
+The `control_plane_endpoint` in the inventory points directly to **controlplane-0's IP address**. This is the IP that all nodes and `kubectl` clients use to reach the Kubernetes API on port `6443`.
 
 ### 2. Connect to Your Nodes via SSH
 For each guide in the roadmap below, open a terminal (or multiple tabs/panes) and SSH into the target VM from your project root:

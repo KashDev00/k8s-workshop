@@ -149,59 +149,8 @@ resource "openstack_compute_instance_v2" "haproxy_lb" {
   ]
 }
 
-
 # ==============================================================================
-# 4. LOAD BALANCER
-# ==============================================================================
-
-# Retrieve Specific Internal Subnet for LB VIP
-data "openstack_networking_subnet_v2" "internal_subnet" {
-  name = var.internal_subnet_name
-}
-
-# Create Load Balancer
-resource "openstack_lb_loadbalancer_v2" "k8s_api_lb" {
-  name          = "${var.stack_name}-ha-k8s-api-lb"
-  vip_subnet_id = data.openstack_networking_subnet_v2.internal_subnet.id
-  description   = "Kubernetes API Load Balancer"
-  security_group_ids = [
-    openstack_networking_secgroup_v2.k8s_common.id
-  ]
-  depends_on = [
-    openstack_compute_instance_v2.control_plane,
-    openstack_compute_instance_v2.worker,
-    openstack_compute_instance_v2.haproxy_lb,
-  ]
-
-}
-
-# Create Listener (TCP 6443)
-resource "openstack_lb_listener_v2" "k8s_api_listener" {
-  name            = "${var.stack_name}-ha-k8s-api-listener"
-  protocol        = "TCP"
-  protocol_port   = 6443
-  loadbalancer_id = openstack_lb_loadbalancer_v2.k8s_api_lb.id
-}
-
-# Create Pool (Round Robin)
-resource "openstack_lb_pool_v2" "k8s_api_pool" {
-  name        = "${var.stack_name}-ha-k8s-api-pool"
-  protocol    = "TCP"
-  lb_method   = "ROUND_ROBIN"
-  listener_id = openstack_lb_listener_v2.k8s_api_listener.id
-}
-
-# Create Members (Control Plane Nodes) - Target the Access IP
-resource "openstack_lb_member_v2" "k8s_api_members" {
-  count   = var.controlplane_count
-  name    = "${var.stack_name}-ha-cp-member-${count.index + 1}"
-  pool_id = openstack_lb_pool_v2.k8s_api_pool.id
-  # Target the Internal Network IP
-  address       = openstack_compute_instance_v2.control_plane[count.index].access_ip_v4
-  protocol_port = 6443
-}
-# ==============================================================================
-# 4.5 FLOATING IP BINDING
+# 4. FLOATING IP BINDING (HAProxy Application LB)
 # ==============================================================================
 
 data "openstack_networking_floatingip_v2" "app_fip" {
@@ -222,11 +171,6 @@ resource "openstack_compute_floatingip_associate_v2" "lb_fip_assoc" {
 # ==============================================================================
 # 5. OUTPUTS
 # ==============================================================================
-
-# Output Load Balancer Private IP
-output "load_balancer_private_ip" {
-  value = openstack_lb_loadbalancer_v2.k8s_api_lb.vip_address
-}
 
 # Output IPs for easy access
 output "control_plane_ips" {
@@ -260,7 +204,7 @@ node_prefix=${var.stack_name}-
 ansible_ssh_private_key_file=${var.ssh_private_key_file}
 ansible_user=ubuntu
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-control_plane_endpoint=${openstack_lb_loadbalancer_v2.k8s_api_lb.vip_address}
+control_plane_endpoint=${openstack_compute_instance_v2.control_plane[0].access_ip_v4}
 clouds_yaml_path=${var.clouds_yaml_path}
 cloud_name=openstack
 EOT
@@ -283,7 +227,7 @@ node_prefix=${var.stack_name}-
 ansible_ssh_private_key_file=${var.ssh_private_key_file}
 ansible_user=ubuntu
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-control_plane_endpoint=${openstack_lb_loadbalancer_v2.k8s_api_lb.vip_address}
+control_plane_endpoint=${openstack_compute_instance_v2.control_plane[0].access_ip_v4}
 clouds_yaml_path=${var.clouds_yaml_path}
 cloud_name=openstack
 EOT
@@ -309,7 +253,7 @@ node_prefix=${var.stack_name}-
 ansible_ssh_private_key_file=${var.ssh_private_key_file}
 ansible_user=ubuntu
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-control_plane_endpoint=${openstack_lb_loadbalancer_v2.k8s_api_lb.vip_address}
+control_plane_endpoint=${openstack_compute_instance_v2.control_plane[0].access_ip_v4}
 clouds_yaml_path=${var.clouds_yaml_path}
 cloud_name=openstack
 EOT
@@ -337,7 +281,7 @@ node_prefix=${var.stack_name}-
 ansible_ssh_private_key_file=${var.ssh_private_key_file}
 ansible_user=ubuntu
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
-control_plane_endpoint=${openstack_lb_loadbalancer_v2.k8s_api_lb.vip_address}
+control_plane_endpoint=${openstack_compute_instance_v2.control_plane[0].access_ip_v4}
 clouds_yaml_path=${var.clouds_yaml_path}
 cloud_name=openstack
 EOT

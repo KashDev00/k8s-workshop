@@ -54,11 +54,6 @@ variable "worker_flavor" {
 
 
 
-variable "internal_subnet_name" {
-  description = "Name of the subnet on the Internal network to use for the Load Balancer VIP"
-  type        = string
-  default     = "Internal2"
-}
 
 variable "lb_network_cidr" {
   description = "The CIDR block for the dedicated LoadBalancer network"

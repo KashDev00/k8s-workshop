@@ -3,8 +3,8 @@
   hosts: controlplane
   become: true
   vars:
-    # Adjust this if you have a Load Balancer VIP. 
-    # Defaults to the node's IP if not provided.
+    # control_plane_endpoint is set in the Ansible inventory by Terraform.
+    # It defaults to controlplane-0's own IP if not provided.
     # Format: "IP:PORT" e.g. "192.168.1.100:6443"
     # control_plane_endpoint: "" 
     pod_network_cidr: "10.0.0.0/16"
@@ -14,7 +14,7 @@
       set_fact:
         final_cp_endpoint: "{{ control_plane_endpoint | default(ansible_default_ipv4.address + ':6443', true) }}"
 
-    - name: Check if existing admin.conf matches current Load Balancer IP
+    - name: Check if existing admin.conf matches current Control Plane Endpoint IP
       shell: |
         if [ -f /etc/kubernetes/admin.conf ]; then
           openssl x509 -noout -text -in /etc/kubernetes/pki/apiserver.crt | grep "IP Address:{{ final_cp_endpoint | split(':') | first }}" || echo "MISMATCH"
@@ -83,13 +83,9 @@
       debug:
         var: final_cp_endpoint
 
-    - name: Update kubeconfig to use LoadBalancer IP
-      delegate_to: localhost
-      become: false
-      shell: |
-        sed -i 's|server: https://.*:6443|server: https://{{ final_cp_endpoint }}:6443|g' "{{ playbook_dir }}/../kubeconfigs/stfc-cloud.kubeconfig"
-      args:
-        executable: /bin/bash
+    - name: Debug fetched kubeconfig path
+      debug:
+        msg: "Kubeconfig fetched to ../kubeconfigs/stfc-cloud.kubeconfig with server endpoint {{ final_cp_endpoint }}"
 
     - name: Rename kubeconfig identifiers to zone-specific names
       delegate_to: localhost
