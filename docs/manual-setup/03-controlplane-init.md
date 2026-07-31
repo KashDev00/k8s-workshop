@@ -32,19 +32,16 @@ Execute the following steps **only on `controlplane-0`**.
 - **What this step does:** Stores the primary API server endpoint address (`IP:PORT`) into an environment variable (`FINAL_CP_ENDPOINT`) for use during cluster initialization. In this setup, this is `controlplane-0`'s own internal IP address.
 - **Why we are doing it:** Kubernetes embeds this endpoint into TLS certificates and kubeconfig files. All worker nodes, secondary control planes, and `kubectl` clients will connect to this address. Setting it consistently ensures all cluster components agree on where to find the API server.
 
-In `playbook_controlplane_init.yaml`, this value is read from the `control_plane_endpoint` variable in your Ansible inventory (which Terraform sets to `controlplane-0`'s IP). You can extract it directly:
+Set `CP_IP` to `controlplane-0`'s internal IP address (you can find this in `ansible/inventory_all.ini` on your local workstation):
 
 ```bash
-# Extract controlplane-0's IP from Ansible inventory:
-CP_IP=$(grep '^control_plane_endpoint=' ansible/inventory_all.ini | cut -d= -f2)
+# Replace 172.16.103.86 with your actual controlplane-0 IP address:
+export CP_IP="172.16.103.86"
 export FINAL_CP_ENDPOINT="${CP_IP}:6443"
 
-# Verify the variable is set correctly
+# Verify the endpoint string:
 echo "Control Plane Endpoint: ${FINAL_CP_ENDPOINT}"
 ```
-
-> [!TIP]
-> If you are building a cluster without `ansible/inventory_all.ini`, set this to `controlplane-0`'s internal IP: `export FINAL_CP_ENDPOINT="<CONTROLPLANE_0_IP>:6443"`.
 
 ---
 
@@ -99,9 +96,9 @@ kubectl get nodes -o wide
 If you want to manage the cluster from your **local machine / laptop**, run these commands from your local repository root:
 
 ```bash
-# 1. Fetch admin.conf from controlplane-0 to your local kubeconfigs folder
+# 1. Fetch ~/.kube/config from controlplane-0 to your local kubeconfigs folder
 mkdir -p kubeconfigs
-scp -i secrets/private_key.pem ubuntu@<CONTROLPLANE_0_IP>:/etc/kubernetes/admin.conf kubeconfigs/stfc-cloud.kubeconfig
+scp -i secrets/private_key.pem ubuntu@<CONTROLPLANE_0_IP>:~/.kube/config kubeconfigs/stfc-cloud.kubeconfig
 
 # 2. Rename cluster, user, and context names
 KUBECONFIG="kubeconfigs/stfc-cloud.kubeconfig"
@@ -156,8 +153,8 @@ kubectl get crd | grep gateway.networking.k8s.io
 helm repo add cilium https://helm.cilium.io/
 helm repo update
 
-# 2. Extract the API server IP (without port 6443) for Cilium configuration
-K8S_SERVICE_HOST=$(echo "${FINAL_CP_ENDPOINT}" | cut -d: -f1)
+# 2. Set K8S_SERVICE_HOST to controlplane-0's internal IP address (e.g., 172.16.103.86):
+export K8S_SERVICE_HOST="172.16.103.86"
 
 # 3. Install Cilium
 helm install cilium cilium/cilium \

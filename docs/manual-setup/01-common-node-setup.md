@@ -215,7 +215,7 @@ sudo chown root:root /data0
 
 ```bash
 # 1. Verify swap is disabled (should output nothing)
-swapoff -s
+swapon --show
 
 # 2. Verify IP forwarding is enabled (should output net.ipv4.ip_forward = 1)
 sysctl net.ipv4.ip_forward
