@@ -17,18 +17,18 @@ The cluster consists of **7 Ubuntu 24.04 LTS Virtual Machines**:
 ```mermaid
 graph TD
     subgraph "OpenStack Cloud Infrastructure"
-        HAPROXY[VM: HAProxy Load Balancer<br/>HTTP App Ingress - Port 80]
+        HAPROXY["VM: HAProxy Load Balancer<br/>HTTP App Ingress - Port 80"]
         
         subgraph "Kubernetes Control Plane (HA)"
-            CP0[controlplane-0<br/>Bootstrap Node<br/>API Endpoint :6443]
-            CP1[controlplane-1<br/>Secondary CP]
-            CP2[controlplane-2<br/>Secondary CP]
+            CP0["controlplane-0<br/>Bootstrap Node<br/>API Endpoint :6443"]
+            CP1["controlplane-1<br/>Secondary CP"]
+            CP2["controlplane-2<br/>Secondary CP"]
         end
         
         subgraph "Kubernetes Worker Nodes"
-            W0[worker-0<br/>Longhorn /data0]
-            W1[worker-1<br/>Longhorn /data0]
-            W2[worker-2<br/>Longhorn /data0]
+            W0["worker-0<br/>Longhorn /data0"]
+            W1["worker-1<br/>Longhorn /data0"]
+            W2["worker-2<br/>Longhorn /data0"]
         end
     end
 

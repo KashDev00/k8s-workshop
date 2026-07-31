@@ -13,12 +13,12 @@ Kubernetes relies on specialized Linux kernel modules that are not loaded by def
 ```mermaid
 graph LR
     subgraph "Linux Kernel Modules"
-        OVERLAY[overlay<br/>Layered Container Filesystems]
-        BR[br_netfilter<br/>Bridge Packet Inspection]
+        OVERLAY["overlay<br/>Layered Container Filesystems"]
+        BR["br_netfilter<br/>Bridge Packet Inspection"]
     end
     
-    OVERLAY -->|Enables| CONTAINERD[containerd / CRI<br/>Image Layer Stacking]
-    BR -->|Enables| IPTABLES[iptables / eBPF<br/>Pod-to-Pod Network Policies]
+    OVERLAY -->|"Enables"| CONTAINERD["containerd / CRI<br/>Image Layer Stacking"]
+    BR -->|"Enables"| IPTABLES["iptables / eBPF<br/>Pod-to-Pod Network Policies"]
 ```
 
 ### 1.1 The `overlay` Filesystem Module
@@ -80,14 +80,14 @@ On modern Ubuntu Linux (20.04/22.04/24.04), **`systemd`** is the system initiali
 
 ```mermaid
 graph TD
-    subgraph "❌ WRONG: Two Competing cgroup Drivers"
-        SYSTEMD1[systemd PID 1<br/>Manages OS cgroups]
-        CGROUPFS[containerd 'cgroupfs' Driver<br/>Manages Pod cgroups independently]
+    subgraph "WRONG: Two Competing cgroup Drivers"
+        SYSTEMD1["systemd PID 1<br/>Manages OS cgroups"]
+        CGROUPFS["containerd 'cgroupfs' Driver<br/>Manages Pod cgroups independently"]
     end
 
-    subgraph "✅ RIGHT: Unified cgroup Management"
-        SYSTEMD2[systemd PID 1<br/>Single Authoritative Manager]
-        CONTAINERD_SYS[containerd 'SystemdCgroup = true'<br/>Delegates cgroup creation to systemd]
+    subgraph "RIGHT: Unified cgroup Management"
+        SYSTEMD2["systemd PID 1<br/>Single Authoritative Manager"]
+        CONTAINERD_SYS["containerd 'SystemdCgroup = true'<br/>Delegates cgroup creation to systemd"]
         SYSTEMD2 --- CONTAINERD_SYS
     end
 ```
@@ -193,9 +193,9 @@ In **Step 01**, we configure third-party software repositories for Docker (`cont
 ```mermaid
 graph TD
     subgraph "Modern Isolated APT Keyring Security (/etc/apt/keyrings/)"
-        KEY[GPG ASCII Key via curl] -->|gpg --dearmor| RING[/etc/apt/keyrings/docker.gpg<br/>Binary Keyring File]
-        REPO[deb signed-by=/etc/apt/keyrings/docker.gpg ... download.docker.com]
-        RING ---|Cryptographically Authorizes ONLY| REPO
+        KEY["GPG ASCII Key via curl"] -->|"gpg --dearmor"| RING["/etc/apt/keyrings/docker.gpg<br/>Binary Keyring File"]
+        REPO["deb [signed-by=/etc/apt/keyrings/docker.gpg] ... download.docker.com"]
+        RING ---|"Cryptographically Authorizes ONLY"| REPO
     end
 ```
 

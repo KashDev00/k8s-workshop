@@ -22,8 +22,8 @@ graph TD
         HAPROXY[VM: HAProxy LB]\r
         \r
         subgraph "Kubernetes Cluster"\r
-            CP1[Control Plane 1<br/>API Endpoint :6443]\r
-            CP2[Control Plane 2]\r
+            CP1["Control Plane 1<br/>API Endpoint :6443"]
+            CP2[Control Plane 2]
             CP3[Control Plane 3]\r
             W1[Worker 1]\r
             W2[Worker 2]\r
