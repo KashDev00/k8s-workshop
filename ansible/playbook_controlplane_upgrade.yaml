@@ -1,0 +1,129 @@
+---
+# playbook_controlplane_upgrade.yaml
+# Automates zero-downtime rolling upgrades across High Availability Control Plane nodes.
+# Uses order: reverse_inventory so that controlplane-3 runs 'kubeadm upgrade apply' first,
+# and controlplane-1 (our primary API endpoint in kubeconfig) is upgraded last.
+#
+# Usage:
+#   # Upgrade all control plane nodes sequentially:
+#   ansible-playbook -i inventory_all.ini playbook_controlplane_upgrade.yaml
+#
+#   # Target a specific node by index or IP using --limit:
+#   ansible-playbook -i inventory_all.ini playbook_controlplane_upgrade.yaml --limit "controlplane[2]"
+#   ansible-playbook -i inventory_all.ini playbook_controlplane_upgrade.yaml --limit "controlplane[1]"
+#   ansible-playbook -i inventory_all.ini playbook_controlplane_upgrade.yaml --limit "172.16.102.76"
+
+- name: Zero-Downtime Rolling Upgrade for High Availability Control Plane Nodes
+  hosts: controlplane
+  become: true
+  serial: 1
+  order: reverse_inventory
+  vars:
+    target_minor_version: "v1.36"
+    target_version: "1.36.3-1.1"
+    kube_version: "{{ target_version.split('-')[0] }}"
+    upgrade_type: "auto"
+
+  tasks:
+    - name: Ensure APT keyring directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Update Kubernetes APT repository to target minor version
+      ansible.builtin.copy:
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ target_minor_version }}/deb/ /
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        mode: '0644'
+
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Unhold kubeadm package
+      ansible.builtin.command: apt-mark unhold kubeadm
+      changed_when: true
+
+    - name: Install target version of kubeadm
+      ansible.builtin.apt:
+        name: "kubeadm={{ target_version }}"
+        state: present
+        allow_downgrade: false
+
+    - name: Hold kubeadm package
+      ansible.builtin.command: apt-mark hold kubeadm
+      changed_when: true
+
+    - name: Check current node hostname
+      ansible.builtin.command: hostname
+      register: node_hostname
+      changed_when: false
+
+    - name: Apply control plane upgrade (kubeadm upgrade apply)
+      ansible.builtin.command: "kubeadm upgrade apply v{{ kube_version }} --yes"
+      when: upgrade_type == 'apply' or (upgrade_type == 'auto' and inventory_hostname == groups['controlplane'][-1])
+      register: upgrade_apply_result
+      changed_when: true
+
+    - name: Upgrade secondary control plane node configuration (kubeadm upgrade node)
+      ansible.builtin.command: kubeadm upgrade node
+      when: upgrade_type == 'node' or (upgrade_type == 'auto' and inventory_hostname != groups['controlplane'][-1])
+      register: upgrade_node_result
+      changed_when: true
+
+    - name: Drain the control plane node before kubelet upgrade
+      ansible.builtin.command:
+        cmd: "kubectl drain {{ node_hostname.stdout }} --ignore-daemonsets --delete-emptydir-data --kubeconfig=/etc/kubernetes/admin.conf"
+      ignore_errors: true
+      changed_when: true
+
+    - name: Unhold kubelet and kubectl packages
+      ansible.builtin.command: apt-mark unhold kubelet kubectl
+      changed_when: true
+
+    - name: Install target version of kubelet and kubectl
+      ansible.builtin.apt:
+        name:
+          - "kubelet={{ target_version }}"
+          - "kubectl={{ target_version }}"
+        state: present
+
+    - name: Hold kubelet and kubectl packages
+      ansible.builtin.command: apt-mark hold kubelet kubectl
+      changed_when: true
+
+    - name: Reload systemd daemon and restart kubelet
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+
+    - name: Wait for Kubernetes API server to become ready after kubelet restart
+      ansible.builtin.command:
+        cmd: "kubectl get nodes --kubeconfig=/etc/kubernetes/admin.conf"
+      register: api_check
+      until: api_check.rc == 0
+      retries: 15
+      delay: 5
+      changed_when: false
+
+    - name: Uncordon the control plane node after kubelet restart
+      ansible.builtin.command:
+        cmd: "kubectl uncordon {{ node_hostname.stdout }} --kubeconfig=/etc/kubernetes/admin.conf"
+      register: uncordon_res
+      until: uncordon_res.rc == 0
+      retries: 5
+      delay: 5
+      changed_when: true
+
+    - name: Verify node readiness
+      ansible.builtin.command:
+        cmd: "kubectl get node {{ node_hostname.stdout }} --kubeconfig=/etc/kubernetes/admin.conf"
+      register: node_status
+      until: "'Ready' in node_status.stdout"
+      retries: 10
+      delay: 5
+      changed_when: false
+      failed_when: "'Ready' not in node_status.stdout"

@@ -162,4 +162,6 @@ sudo systemctl restart kubelet
 
 You have successfully built an enterprise-grade High Availability Kubernetes cluster on OpenStack manually. You are now ready to deploy workloads, Ingress Gateways, and Longhorn persistent volumes!
 
+### [Next Step: Zero-Downtime HA Cluster Rolling Upgrade &rarr;](07-ha-cluster-upgrade.md)
+
 * **[&larr; Back to Documentation Overview](README.md)**

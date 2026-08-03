@@ -112,6 +112,7 @@ Follow these guides in numerical order to build your cluster from scratch:
 | **04** | **[Joining Additional Control Planes](04-controlplane-join.md)** | `playbook_controlplane_join.yaml` | **controlplane-1 & 2**<br/>(Secondary CP) | Re-uploading TLS certificates, generating `kubeadm` join tokens, and forming an HA `etcd` and API control plane. |
 | **05** | **[Joining Worker Nodes](05-worker-join.md)** | `playbook_worker_join.yaml` | **worker-0, 1, 2** | Preparing Longhorn storage directories (`/data0`) and joining worker nodes to execute workloads. |
 | **06** | **[Verification & Troubleshooting](06-verification-and-troubleshooting.md)** | *(Manual Verification)* | **Any Node / Local** | Validating cluster readiness, debugging Cilium/Hubble connectivity, testing Gateway API Ingress, and resolving IP mismatch errors. |
+| **07** | **[HA Cluster Rolling Upgrade](07-ha-cluster-upgrade.md)** | `playbook_controlplane_upgrade.yaml`<br/>`playbook_worker_upgrade.yaml` | **All 6 K8s Nodes** | Performing zero-downtime rolling upgrades across an HA cluster (`kubeadm upgrade apply` vs `node`, draining/uncordoning nodes, and version skew compatibility). |
 
 ---
 

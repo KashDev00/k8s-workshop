@@ -1,0 +1,112 @@
+---
+# playbook_worker_upgrade.yaml
+# Automates zero-downtime rolling upgrades across Kubernetes Worker nodes.
+# Upgrades one worker at a time (serial: 1), draining workloads to other nodes before upgrading.
+#
+# Usage:
+#   # Upgrade all worker nodes sequentially:
+#   ansible-playbook -i inventory_all.ini playbook_worker_upgrade.yaml
+#
+#   # Target a specific worker node by index or IP using --limit:
+#   ansible-playbook -i inventory_all.ini playbook_worker_upgrade.yaml --limit "workers[0]"
+#   ansible-playbook -i inventory_all.ini playbook_worker_upgrade.yaml --limit "workers[1]"
+#   ansible-playbook -i inventory_all.ini playbook_worker_upgrade.yaml --limit "172.16.102.113"
+
+- name: Zero-Downtime Rolling Upgrade for Kubernetes Worker Nodes
+  hosts: workers
+  become: true
+  serial: 1
+  vars:
+    target_minor_version: "v1.36"
+    target_version: "1.36.3-1.1"
+
+  tasks:
+    - name: Check current node hostname
+      ansible.builtin.command: hostname
+      register: node_hostname
+      changed_when: false
+
+    - name: Drain the worker node before package upgrade
+      ansible.builtin.command:
+        cmd: "kubectl drain {{ node_hostname.stdout }} --ignore-daemonsets --delete-emptydir-data --kubeconfig=/etc/kubernetes/admin.conf"
+      delegate_to: "{{ groups['controlplane'][0] }}"
+      ignore_errors: true
+      changed_when: true
+
+    - name: Ensure APT keyring directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Update Kubernetes APT repository to target minor version
+      ansible.builtin.copy:
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ target_minor_version }}/deb/ /
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        mode: '0644'
+
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Unhold kubeadm package
+      ansible.builtin.command: apt-mark unhold kubeadm
+      changed_when: true
+
+    - name: Install target version of kubeadm
+      ansible.builtin.apt:
+        name: "kubeadm={{ target_version }}"
+        state: present
+        allow_downgrade: false
+
+    - name: Hold kubeadm package
+      ansible.builtin.command: apt-mark hold kubeadm
+      changed_when: true
+
+    - name: Upgrade local worker node configuration
+      ansible.builtin.command: kubeadm upgrade node
+      register: upgrade_node_result
+      changed_when: true
+
+    - name: Unhold kubelet and kubectl packages
+      ansible.builtin.command: apt-mark unhold kubelet kubectl
+      changed_when: true
+
+    - name: Install target version of kubelet and kubectl
+      ansible.builtin.apt:
+        name:
+          - "kubelet={{ target_version }}"
+          - "kubectl={{ target_version }}"
+        state: present
+
+    - name: Hold kubelet and kubectl packages
+      ansible.builtin.command: apt-mark hold kubelet kubectl
+      changed_when: true
+
+    - name: Reload systemd daemon and restart kubelet
+      ansible.builtin.systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+
+    - name: Uncordon the worker node after kubelet restart
+      ansible.builtin.command:
+        cmd: "kubectl uncordon {{ node_hostname.stdout }} --kubeconfig=/etc/kubernetes/admin.conf"
+      delegate_to: "{{ groups['controlplane'][0] }}"
+      register: uncordon_res
+      until: uncordon_res.rc == 0
+      retries: 5
+      delay: 5
+      changed_when: true
+
+    - name: Verify worker node readiness
+      ansible.builtin.command:
+        cmd: "kubectl get node {{ node_hostname.stdout }} --kubeconfig=/etc/kubernetes/admin.conf"
+      delegate_to: "{{ groups['controlplane'][0] }}"
+      register: node_status
+      until: "'Ready' in node_status.stdout"
+      retries: 10
+      delay: 5
+      changed_when: false
+      failed_when: "'Ready' not in node_status.stdout"
