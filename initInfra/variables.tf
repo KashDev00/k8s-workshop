@@ -13,7 +13,6 @@ variable "clouds_yaml_path" {
 variable "stack_name" {
   description = "Stack name for resource naming and config lookup"
   type        = string
-  default     = "k8s"
 }
 
 variable "controlplane_count" {
@@ -37,23 +36,19 @@ variable "ssh_private_key_file" {
 variable "key_pair_name" {
   description = "Name of the OpenStack SSH key pair"
   type        = string
-  default     = "FASE_CLOUD_DEV"
 }
 
 variable "controlplane_flavor" {
   description = "Flavor name for control plane nodes"
   type        = string
-  default     = "l3.tiny"
+  default     = "l3.nano"
 }
 
 variable "worker_flavor" {
   description = "Flavor name for worker nodes"
   type        = string
-  default     = "l3.tiny"
+  default     = "l3.nano"
 }
-
-
-
 
 variable "lb_network_cidr" {
   description = "The CIDR block for the dedicated LoadBalancer network"
@@ -76,5 +71,4 @@ variable "lb_flavor" {
 variable "lb_fip_address" {
   description = "The Floating IP address to assign to the application load balancer"
   type        = string
-  default     = "130.246.81.27"
 }
