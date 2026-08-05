@@ -94,7 +94,8 @@ EOF
 # 1. Determine the primary IP address of enp4s0
 LB_IP=$(ip -4 addr show enp4s0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
 echo "Load Balancer IP on enp4s0 is: ${LB_IP}"
-
+```
+```bash
 # 2. Create the Netplan policy routing configuration
 cat <<EOF | sudo tee /etc/netplan/60-policy-routing.yaml
 network:
@@ -109,7 +110,8 @@ network:
           via: 10.0.50.1
           table: 102
 EOF
-
+```
+```bash
 # 3. Apply the Netplan rules immediately
 sudo netplan apply
 ```
@@ -127,11 +129,13 @@ sudo netplan apply
 ```bash
 # 1. Validate HAProxy configuration syntax
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg
-
+```
+```bash
 # 2. Restart and enable HAProxy
 sudo systemctl restart haproxy
 sudo systemctl enable haproxy
-
+```
+```bash
 # 3. Check service status
 systemctl status haproxy --no-pager
 ```
@@ -146,7 +150,8 @@ systemctl status haproxy --no-pager
 ```bash
 # 1. Validate HAProxy configuration
 sudo haproxy -c -f /etc/haproxy/haproxy.cfg
-
+```
+```bash
 # 2. Verify port 80 is open and listening
 sudo ss -tulpn | grep :80
 ```

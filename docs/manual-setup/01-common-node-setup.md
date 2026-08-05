@@ -96,18 +96,21 @@ cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
 overlay
 br_netfilter
 EOF
-
+```
+```bash
 # 2. Load the modules explicitly into the running kernel
 sudo modprobe overlay
 sudo modprobe br_netfilter
-
+```
+```bash
 # 3. Configure sysctl parameters for network bridging and IPv4 forwarding
 cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
 net.bridge.bridge-nf-call-iptables  = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward                 = 1
 EOF
-
+```
+```bash
 # 4. Apply the sysctl parameters without rebooting
 sudo sysctl --system
 ```
@@ -123,28 +126,34 @@ sudo sysctl --system
 # 1. Install prerequisites
 sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release socat
-
+```
+```bash
 # 2. Add Docker official GPG key and APT repository
 # Note: Why use /etc/apt/keyrings/ and gpg --dearmor? See Step 00 (Linux Fundamentals) for how isolated APT keyrings protect your OS.
 sudo mkdir -p /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-
+```
+```bash
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
   $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list
-
+```
+```bash
 # 3. Install containerd
 sudo apt-get update
 sudo apt-get install -y containerd.io
-
+```
+```bash
 # 4. Generate the default containerd configuration file
 sudo mkdir -p /etc/containerd
 containerd config default | sudo tee /etc/containerd/config.toml > /dev/null
-
+```
+```bash
 # 5. Configure containerd to use systemd cgroups and enable CRI plugin
 sudo sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
 sudo sed -i 's/^[[:space:]]*disabled_plugins = \["cri"\]/# &/' /etc/containerd/config.toml
-
+```
+```bash
 # 6. Restart and enable containerd service
 sudo systemctl restart containerd
 sudo systemctl enable containerd
@@ -165,22 +174,27 @@ sudo systemctl enable containerd
 ```bash
 # 1. Define Kubernetes release version
 K8S_VERSION="v1.35"
-
+```
+```bash
 # 2. Add Kubernetes GPG signing key and APT repository
 curl -fsSL "https://pkgs.k8s.io/core:/stable:/${K8S_VERSION}/deb/Release.key" | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${K8S_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+```
+```bash
 # 3. Install kubeadm, kubelet, and kubectl
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm kubectl
-
+```
+```bash
 # 4. Pin (hold) package versions so 'apt upgrade' never accidentally breaks cluster version parity
 sudo apt-mark hold kubelet kubeadm kubectl
-
+```
+```bash
 # 5. Configure Kubelet hostname override
 OS_HOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1)
 echo "KUBELET_EXTRA_ARGS=--hostname-override=${OS_HOSTNAME}" | sudo tee /etc/default/kubelet
-
+```
+```bash
 # 6. Restart kubelet service
 sudo systemctl restart kubelet
 sudo systemctl enable kubelet
@@ -216,13 +230,16 @@ sudo chown root:root /data0
 ```bash
 # 1. Verify swap is disabled (should output nothing)
 swapon --show
-
+```
+```bash
 # 2. Verify IP forwarding is enabled (should output net.ipv4.ip_forward = 1)
 sysctl net.ipv4.ip_forward
-
+```
+```bash
 # 3. Verify containerd is running (should output active)
 systemctl is-active containerd
-
+```
+```bash
 # 4. Verify kubeadm version (should output v1.35.x)
 kubeadm version
 ```

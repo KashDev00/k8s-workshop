@@ -38,7 +38,8 @@ Set `CP_IP` to `controlplane-0`'s internal IP address (you can find this in `ans
 # Replace 172.16.103.86 with your actual controlplane-0 IP address:
 export CP_IP="172.16.103.86"
 export FINAL_CP_ENDPOINT="${CP_IP}:6443"
-
+```
+```bash
 # Verify the endpoint string:
 echo "Control Plane Endpoint: ${FINAL_CP_ENDPOINT}"
 ```
@@ -58,7 +59,8 @@ echo "Control Plane Endpoint: ${FINAL_CP_ENDPOINT}"
 ```bash
 # 1. Fetch OpenStack instance hostname
 OS_HOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1)
-
+```
+```bash
 # 2. Run kubeadm init
 sudo kubeadm init \
   --node-name="${OS_HOSTNAME}" \
@@ -80,7 +82,8 @@ sudo kubeadm init \
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
-
+```
+```bash
 # Test your access
 kubectl get nodes -o wide
 ```
@@ -131,7 +134,8 @@ helm version
 
 ```bash
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
-
+```
+```bash
 # Verify Gateway API CRDs are installed
 kubectl get crd | grep gateway.networking.k8s.io
 ```
@@ -152,10 +156,12 @@ kubectl get crd | grep gateway.networking.k8s.io
 # 1. Add Cilium Helm repository
 helm repo add cilium https://helm.cilium.io/
 helm repo update
-
+```
+```bash
 # 2. Set K8S_SERVICE_HOST to controlplane-0's internal IP address (e.g., 172.16.103.86):
 export K8S_SERVICE_HOST="172.16.103.86"
-
+```
+```bash
 # 3. Install Cilium
 helm install cilium cilium/cilium \
   --namespace kube-system \
@@ -183,7 +189,8 @@ helm install cilium cilium/cilium \
 # 1. Add Metrics Server Helm repository
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
 helm repo update
-
+```
+```bash
 # 2. Install Metrics Server
 helm install metrics-server metrics-server/metrics-server \
   --namespace kube-system \
@@ -200,10 +207,12 @@ helm install metrics-server metrics-server/metrics-server \
 ```bash
 # 1. Check node readiness (controlplane-0 should transition to Ready!)
 kubectl get nodes -o wide
-
+```
+```bash
 # 2. Check that Cilium and Metrics Server pods are Running
 kubectl get pods -n kube-system
-
+```
+```bash
 # 3. Check that GatewayClass 'cilium' is available
 kubectl get gatewayclass
 ```

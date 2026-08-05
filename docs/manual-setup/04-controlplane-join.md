@@ -39,11 +39,13 @@ Execute these commands **on `controlplane-0`**:
 # 1. Re-upload TLS certificates to the cluster secret store and capture the decryption key
 CERT_KEY=$(sudo kubeadm init phase upload-certs --upload-certs | tail -n 1)
 echo "Certificate Key: ${CERT_KEY}"
-
+```
+```bash
 # 2. Generate the base join command with a fresh token
 BASE_JOIN_CMD=$(sudo kubeadm token create --print-join-command)
 echo "Base Join Command: ${BASE_JOIN_CMD}"
-
+```
+```bash
 # 3. Print the full HA Control Plane Join Command
 echo -e "\n=========================================================================="
 echo "Run the following command with 'sudo' on controlplane-1 and controlplane-2:"
@@ -69,7 +71,8 @@ else
   # 2. Fetch the true OpenStack instance hostname
   OS_HOSTNAME=$(curl -s http://169.254.169.254/latest/meta-data/hostname | cut -d. -f1)
   echo "Joining node as: ${OS_HOSTNAME}"
-
+```
+```bash
   # 3. Execute the join command from Step 1 (replace the example below with your output from controlplane-0)
   # IMPORTANT: Append --node-name="${OS_HOSTNAME}" to ensure hostname consistency!
   sudo kubeadm join 10.0.10.100:6443 \

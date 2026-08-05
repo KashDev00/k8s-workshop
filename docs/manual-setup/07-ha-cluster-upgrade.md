@@ -70,9 +70,11 @@ Run this on **any control plane node**:
 ```bash
 # 1. If upgrading across minor versions (e.g., v1.35 -> v1.36), update your APT repository:
 export TARGET_MINOR_VERSION="v1.36"
-
+```
+```bash
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${TARGET_MINOR_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+```
+```bash
 # 2. Update package lists and check available versions:
 sudo apt-get update
 apt-cache madison kubeadm
@@ -101,36 +103,45 @@ SSH into **`controlplane-1`** and run:
 export TARGET_MINOR_VERSION="v1.36"
 export TARGET_VERSION="1.36.0-1.1"
 export KUBE_VERSION=$(echo "${TARGET_VERSION}" | cut -d'-' -f1)
-
+```
+```bash
 # 2. Update APT repository source for the target minor version
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${TARGET_MINOR_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+```
+```bash
 # 3. Unhold and upgrade kubeadm
 sudo apt-mark unhold kubeadm
 sudo apt-get update && sudo apt-get install -y kubeadm=${TARGET_VERSION}*
 sudo apt-mark hold kubeadm
-
+```
+```bash
 # 4. Verify that kubeadm is upgraded
 kubeadm version
-
+```
+```bash
 # 5. Check the upgrade plan (validates cluster health and component versions)
 sudo kubeadm upgrade plan
-
+```
+```bash
 # 6. Apply the control plane upgrade (ONLY run on this first control plane node!)
 sudo kubeadm upgrade apply v${KUBE_VERSION} --yes
-
+```
+```bash
 # 7. Drain the node to safely reschedule any non-control-plane pods
 kubectl drain controlplane-1 --ignore-daemonsets
-
+```
+```bash
 # 8. Unhold and upgrade kubelet and kubectl
 sudo apt-mark unhold kubelet kubectl
 sudo apt-get install -y kubelet=${TARGET_VERSION}* kubectl=${TARGET_VERSION}*
 sudo apt-mark hold kubelet kubectl
-
+```
+```bash
 # 9. Reload systemd and restart kubelet
 sudo systemctl daemon-reload
 sudo systemctl restart kubelet
-
+```
+```bash
 # 10. Uncordon the node to allow Pods to be scheduled again
 kubectl uncordon controlplane-1
 ```
@@ -148,18 +159,22 @@ Repeat these commands **first on `controlplane-2`**, and **finally on `controlpl
 # 1. Export target versions on this node
 export TARGET_MINOR_VERSION="v1.36"
 export TARGET_VERSION="1.36.0-1.1"
-
+```
+```bash
 # 2. Update APT repository source for the target minor version
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${TARGET_MINOR_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+```
+```bash
 # 3. Unhold and upgrade kubeadm
 sudo apt-mark unhold kubeadm
 sudo apt-get update && sudo apt-get install -y kubeadm=${TARGET_VERSION}*
 sudo apt-mark hold kubeadm
-
+```
+```bash
 # 4. Upgrade local control plane node configuration (NOTE: use 'node', NOT 'apply'!)
 sudo kubeadm upgrade node
-
+```
+```bash
 # 5. Drain this node from workloads
 kubectl drain $(hostname) --ignore-daemonsets
 
@@ -167,11 +182,13 @@ kubectl drain $(hostname) --ignore-daemonsets
 sudo apt-mark unhold kubelet kubectl
 sudo apt-get install -y kubelet=${TARGET_VERSION}* kubectl=${TARGET_VERSION}*
 sudo apt-mark hold kubelet kubectl
-
+```
+```bash
 # 7. Reload systemd and restart kubelet
 sudo systemctl daemon-reload
 sudo systemctl restart kubelet
-
+```
+```bash
 # 8. Uncordon the node
 kubectl uncordon $(hostname)
 ```
@@ -197,23 +214,28 @@ SSH into **`worker-0`** and run:
 ```bash
 export TARGET_MINOR_VERSION="v1.36"
 export TARGET_VERSION="1.36.0-1.1"
-
+```
+```bash
 # 1. Update APT repository source for the target minor version
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${TARGET_MINOR_VERSION}/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-
+```
+```bash
 # 2. Unhold and upgrade kubeadm
 sudo apt-mark unhold kubeadm
 sudo apt-get update && sudo apt-get install -y kubeadm=${TARGET_VERSION}*
 sudo apt-mark hold kubeadm
-
+```
+```bash
 # 3. Upgrade local worker node configuration
 sudo kubeadm upgrade node
-
+```
+```bash
 # 4. Unhold and upgrade kubelet and kubectl
 sudo apt-mark unhold kubelet kubectl
 sudo apt-get install -y kubelet=${TARGET_VERSION}* kubectl=${TARGET_VERSION}*
 sudo apt-mark hold kubelet kubectl
-
+```
+```bash
 # 5. Reload systemd and restart kubelet
 sudo systemctl daemon-reload
 sudo systemctl restart kubelet
